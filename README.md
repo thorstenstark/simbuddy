@@ -1,4 +1,4 @@
-[![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat)]
+![License](https://img.shields.io/badge/license-MIT-green.svg?style=flat)
 
 # SimulatorHelper
 SimulatorHelper is a little tool, to help you set up only specific iOS simulators instead of all possible devices for a given iOS version.
