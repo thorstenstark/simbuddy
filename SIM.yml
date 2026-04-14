@@ -12,3 +12,9 @@
 'iPad mini (A17 Pro)': ['newest']
 # Large tablet (13")
 'iPad Pro 13-inch (M5)': ['newest']
+
+# watchOS simulators paired with iPhones
+watch:
+  'Apple Watch Series 11 (46mm)':
+    os: ['newest']
+    pair_with: 'iPhone 17 Pro Max'
