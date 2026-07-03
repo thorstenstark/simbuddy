@@ -12,17 +12,25 @@ def build_device_type_lookup
 end
 
 def build_runtime_lookup(platform)
-	# Query actual runtime identifiers from simctl for the given platform
+	# Query actual runtime identifiers from simctl for the given platform.
+	# Keyed by the full runtime version (e.g. "26.4.1"), not major.minor.
 	data = JSON.parse(`xcrun simctl list -j runtimes`)
 	lookup = {}
 	data['runtimes'].each do |r|
 		next unless r['isAvailable'] && r['platform'] == platform
-		# Map "18.5" → identifier, using major.minor extracted from identifier
-		if r['identifier'] =~ /#{platform.gsub(' ', '-')}-(\d+)-(\d+)/i
-			lookup["#{$1}.#{$2}"] = r['identifier']
-		end
+		lookup[r['version']] = r['identifier']
 	end
 	lookup
+end
+
+def resolve_version(lookup, requested)
+	# Resolve a requested version against the available runtimes, ignoring the
+	# patch component: an exact match wins, otherwise pick the newest runtime
+	# whose version starts with "requested." (e.g. "26.4" → "26.4.1").
+	# Returns the actual available version string, or nil if nothing matches.
+	return requested if lookup.key?(requested)
+	candidates = lookup.keys.select { |v| v.start_with?("#{requested}.") }
+	candidates.max_by { |v| Gem::Version.new(v) }
 end
 
 def prompt(default, *args)
@@ -34,6 +42,29 @@ end
 def newest_version_from(lookup)
 	lookup.keys.max_by { |v| Gem::Version.new(v) }
 end
+
+def print_available_runtimes
+	# Show all installed simulator runtimes up front, grouped by platform,
+	# so the user sees which OS SDKs are available before any sync happens.
+	data = JSON.parse(`xcrun simctl list -j runtimes`)
+	available = data['runtimes'].select { |r| r['isAvailable'] }
+
+	puts "=== Available OS Runtimes ==="
+	if available.empty?
+		puts "  (none installed)"
+		puts ""
+		return
+	end
+
+	available.group_by { |r| r['platform'] }.sort.each do |platform, runtimes|
+		versions = runtimes.sort_by { |r| Gem::Version.new(r['version']) }.map { |r| r['version'] }
+		puts "  #{platform}: #{versions.join(', ')}"
+	end
+	puts ""
+end
+
+# Show all available OS SDKs/runtimes before doing anything else
+print_available_runtimes
 
 # Load config and split iOS vs watch
 config = YAML.load_file('SIM.yml')
@@ -88,13 +119,14 @@ config.each do |device, versions|
 		next
 	end
 	versions.each do |version|
-		rt_id = ios_runtime_lookup[version]
+		resolved = resolve_version(ios_runtime_lookup, version)
+		rt_id = resolved && ios_runtime_lookup[resolved]
 		unless rt_id
 			puts "Warning: iOS #{version} runtime not installed — skipping '#{device} (#{version})'"
 			next
 		end
 		key = [type_id, rt_id]
-		desired[key] = { device: device, version: version }
+		desired[key] = { device: device, version: resolved }
 	end
 end
 
@@ -115,13 +147,14 @@ watch_config.each do |device, entry|
 	end
 
 	entry['os'].each do |version|
-		rt_id = watch_runtime_lookup[version]
+		resolved = resolve_version(watch_runtime_lookup, version)
+		rt_id = resolved && watch_runtime_lookup[resolved]
 		unless rt_id
 			puts "Warning: watchOS #{version} runtime not installed — skipping '#{device} (#{version})'"
 			next
 		end
 		key = [type_id, rt_id]
-		desired_watches[key] = { device: device, version: version }
+		desired_watches[key] = { device: device, version: resolved }
 		desired_pairings[key] = pair_with if pair_with
 	end
 end

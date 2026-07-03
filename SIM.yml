@@ -7,7 +7,7 @@
 # ProMotion + Dynamic Island on current stable
 'iPhone 16 Pro': ['18.5']
 # Largest screen (6.9") + newest iOS
-'iPhone 17 Pro Max': ['newest']
+'iPhone 17 Pro Max': ['newest', '26.4']
 # Compact tablet (8.3")
 'iPad mini (A17 Pro)': ['newest']
 # Large tablet (13")
